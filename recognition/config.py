@@ -126,6 +126,15 @@ dataset.retina.num_classes = 93431
 dataset.retina.image_shape = (112,112,3)
 dataset.retina.val_targets = ['lfw', 'cfp_fp', 'agedb_30']
 
+dataset.casia = edict()
+dataset.casia.dataset = 'casia'
+dataset.casia.dataset_path = '../datasets/faces_casia'
+dataset.casia.num_classes = 10572
+dataset.casia.image_shape = (112,112,3)
+dataset.casia.val_targets = ['lfw', 'cfp_fp', 'agedb_30']
+dataset.casia.max_steps = 32000
+dataset.casia.lr_steps = '20000,28000'
+
 loss = edict()
 loss.softmax = edict()
 loss.softmax.loss_name = 'softmax'

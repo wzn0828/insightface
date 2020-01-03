@@ -38,6 +38,15 @@ args = None
 
 
 def parse_args():
+
+  ##-------local config-------##
+  os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
+  default.models_root = '../Experiments/casia-arcface-r50'
+  default.network = 'r50'
+  default.dataset = 'casia'
+  default.loss = 'arcface'
+  ##-------local config-------##
+
   parser = argparse.ArgumentParser(description='Train face network')
   # general
   parser.add_argument('--dataset', default=default.dataset, help='dataset config')
