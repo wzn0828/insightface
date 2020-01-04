@@ -41,10 +41,14 @@ def parse_args():
 
   ##-------local config-------##
   os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
-  default.models_root = '../Experiments/casia-arcface-r50'
+  default.models_root = '../Experiments/casia-arcface-r50-detach-diff'
   default.network = 'r50'
   default.dataset = 'casia'
   default.loss = 'arcface'
+
+  config.detach_diff = True
+  config.m_mode = 'default'     # 'default', 'larger_sqrt'
+  config.margin = 0.6
   ##-------local config-------##
 
   parser = argparse.ArgumentParser(description='Train face network')
@@ -102,7 +106,11 @@ def get_symbol(args):
         if config.loss_m1!=1.0:
           t = t*config.loss_m1
         if config.loss_m2>0.0:
-          t = t+config.loss_m2
+          if config.m_mode == 'larger_sqrt':
+            t = t + config.margin * mx.symbol.sqrt(t)
+            t = mx.symbol.clip(t, a_min=0., a_max=math.pi)
+          else:
+            t = t+config.loss_m2
         body = mx.sym.cos(t)
         if config.loss_m3>0.0:
           body = body - config.loss_m3
@@ -111,6 +119,8 @@ def get_symbol(args):
         diff = mx.sym.expand_dims(diff, 1)
         gt_one_hot = mx.sym.one_hot(gt_label, depth = config.num_classes, on_value = 1.0, off_value = 0.0)
         body = mx.sym.broadcast_mul(gt_one_hot, diff)
+        if config.detach_diff:
+            body = mx.symbol.BlockGrad(body)
         fc7 = fc7+body
   elif config.loss_name.find('triplet')>=0:
     is_softmax = False
