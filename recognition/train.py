@@ -14,7 +14,7 @@ import mxnet as mx
 from mxnet import ndarray as nd
 import argparse
 import mxnet.optimizer as optimizer
-from config import config, default, generate_config
+from config import config, default, dataset, generate_config
 from metric import *
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'common'))
 import flops_counter
@@ -41,13 +41,19 @@ def parse_args():
 
   ##-------local config-------##
   os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
-  default.models_root = '../Experiments/casia-arcface-r50-detach-diff'
+  default.models_root = '../Experiments/casia-arcface-r50-detachdiff-sqrt-m0.6'
   default.network = 'r50'
   default.dataset = 'casia'
   default.loss = 'arcface'
+  # default.per_batch_size = 122
 
+  # dataset.casia.max_steps = 34000
+  # dataset.casia.lr_steps = '21000,29500'
+
+  # config.net_se = 1
+  config.fix_gamma = True
   config.detach_diff = True
-  config.m_mode = 'default'     # 'default', 'larger_sqrt'
+  config.m_mode = 'larger_sqrt'     # 'default', 'larger_sqrt'
   config.margin = 0.6
   ##-------local config-------##
 
