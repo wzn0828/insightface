@@ -77,6 +77,12 @@ def parse_args():
   parser.add_argument('--per-batch-size', type=int, default=default.per_batch_size, help='batch size in each context')
   parser.add_argument('--kvstore', type=str, default=default.kvstore, help='kvstore setting')
   args = parser.parse_args()
+
+  ##-------local config-------##
+  args.angular_loss = True
+  args.angular_loss_weight = 0.5
+  ##-------local config-------##
+
   return args
 
 
@@ -168,8 +174,22 @@ def get_symbol(args):
   else:
     out_list.append(mx.sym.BlockGrad(gt_label))
     out_list.append(triplet_loss)
+
+  # --- add hpn loss --- #
+  # 　angular loss
+  if args.angular_loss:
+      # Remove diagnonal from loss
+      product = mx.symbol.linalg.syrk(_weight, alpha=1., transpose=False) - 2. * mx.symbol.eye(config.num_classes)
+      # Minimize maximum cosine similarity.
+      loss = mx.symbol.mean(mx.symbol.max(product, axis=1))
+      angular_loss = mx.symbol.MakeLoss(loss, grad_scale=args.angular_loss_weight)
+
+      out_list.append(angular_loss)
+  # --- add hpn loss --- #
+
   out = mx.symbol.Group(out_list)
   return out
+
 
 def train_net(args):
     ctx = []
