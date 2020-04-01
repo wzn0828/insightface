@@ -18,6 +18,7 @@ from config import config, default, dataset, generate_config
 from metric import *
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'common'))
 import flops_counter
+from helper import Logger
 sys.path.append(os.path.join(os.path.dirname(__file__), 'eval'))
 import verification
 sys.path.append(os.path.join(os.path.dirname(__file__), 'symbol'))
@@ -80,7 +81,8 @@ def parse_args():
 
   ##-------local config-------##
   args.angular_loss = True
-  args.angular_loss_weight = 0.5
+  args.angular_losstype = 'theta'
+  args.angular_loss_weight = 1.0
   ##-------local config-------##
 
   return args
@@ -175,17 +177,20 @@ def get_symbol(args):
     out_list.append(mx.sym.BlockGrad(gt_label))
     out_list.append(triplet_loss)
 
-  # --- add hpn loss --- #
-  # 　angular loss
+  # --- add angular loss --- #
   if args.angular_loss:
       # Remove diagnonal from loss
       product = mx.symbol.linalg.syrk(_weight, alpha=1., transpose=False) - 2. * mx.symbol.eye(config.num_classes)
       # Minimize maximum cosine similarity.
-      loss = mx.symbol.mean(mx.symbol.max(product, axis=1))
-      angular_loss = mx.symbol.MakeLoss(loss, grad_scale=args.angular_loss_weight)
+      if args.angular_losstype == 'cosine':
+        loss = mx.symbol.mean(mx.symbol.max(product, axis=1))
+      elif args.angular_losstype == 'theta':
+        theta = mx.symbol.arccos(mx.symbol.max(product, axis=1))
+        loss = -mx.symbol.mean(theta)
 
+      angular_loss = mx.symbol.MakeLoss(loss, grad_scale=args.angular_loss_weight)
       out_list.append(angular_loss)
-  # --- add hpn loss --- #
+  # --- add angular loss --- #
 
   out = mx.symbol.Group(out_list)
   return out
@@ -207,6 +212,7 @@ def train_net(args):
     print('prefix', prefix)
     if not os.path.exists(prefix_dir):
       os.makedirs(prefix_dir)
+    sys.stdout = Logger(prefix_dir + '/log.txt')
     args.ctx_num = len(ctx)
     args.batch_size = args.per_batch_size*args.ctx_num
     args.rescale_threshold = 0
@@ -272,7 +278,11 @@ def train_net(args):
           triplet_params       = triplet_params,
           mx_model             = model,
       )
-      _metric = LossValueMetric()
+      if args.angular_loss:
+          indice=-2
+      else:
+          indice=-1
+      _metric = LossValueMetric(indice)
       eval_metrics = [mx.metric.create(_metric)]
     else:
       from image_iter import FaceImageIter
@@ -290,8 +300,16 @@ def train_net(args):
       metric1 = AccMetric()
       eval_metrics = [mx.metric.create(metric1)]
       if config.ce_loss:
-        metric2 = LossValueMetric()
+        if args.angular_loss:
+              indice = -2
+        else:
+              indice = -1
+        metric2 = LossValueMetric(indice)
         eval_metrics.append( mx.metric.create(metric2) )
+
+    if args.angular_loss:
+      metric3 = LossValueMetric()
+      eval_metrics.append(mx.metric.create(metric3))
 
     if config.net_name=='fresnet' or config.net_name=='fmobilefacenet':
       initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
@@ -393,6 +411,7 @@ def train_net(args):
           else:
             mx.model.save_checkpoint(prefix, msave, model.symbol, arg, aux)
         print('[%d]Accuracy-Highest: %1.5f'%(mbatch, highest_acc[-1]))
+      sys.stdout.flush()
       if config.max_steps>0 and mbatch>config.max_steps:
         sys.exit(0)
 

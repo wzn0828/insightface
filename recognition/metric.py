@@ -27,16 +27,17 @@ class AccMetric(mx.metric.EvalMetric):
     self.num_inst += len(pred_label.flat)
 
 class LossValueMetric(mx.metric.EvalMetric):
-  def __init__(self):
+  def __init__(self, indice=-1):
     self.axis = 1
     super(LossValueMetric, self).__init__(
         'lossvalue', axis=self.axis,
         output_names=None, label_names=None)
     self.losses = []
+    self.indice = indice
 
   def update(self, labels, preds):
     #label = labels[0].asnumpy()
-    pred = preds[-1].asnumpy()
+    pred = preds[self.indice].asnumpy()
     #print('in loss', pred.shape)
     #print(pred)
     loss = pred[0]
