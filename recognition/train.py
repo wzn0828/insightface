@@ -81,8 +81,9 @@ def parse_args():
 
   ##-------local config-------##
   args.angular_loss = True
+  args.angular_loss_hidden = False
   args.angular_losstype = 'theta'
-  args.angular_loss_weight = 1.0
+  args.angular_loss_weight = 0.03
   ##-------local config-------##
 
   return args
@@ -188,12 +189,43 @@ def get_symbol(args):
         theta = mx.symbol.arccos(mx.symbol.max(product, axis=1))
         loss = -mx.symbol.mean(theta)
 
+      if args.angular_loss_hidden:
+          internals = embedding.get_internals()
+          internals_list = embedding.get_internals().list_outputs()
+          for i in range(0, len(internals_list)):
+              if 'weight' in internals_list[i]:
+                  # get angular loss
+                  loss = loss + get_angular_loss(internals[i])
+
       angular_loss = mx.symbol.MakeLoss(loss, grad_scale=args.angular_loss_weight)
       out_list.append(angular_loss)
   # --- add angular loss --- #
 
   out = mx.symbol.Group(out_list)
+
   return out
+
+
+def get_angular_loss(weight):
+    '''
+    :param weight: parameter of model, out_features *　in_features
+    :return: angular loss
+    '''
+
+    if 'conv' in weight.name:
+        # for convolution layers, flatten
+        num_filter = int(weight.attr('num_filter'))
+        weight = weight.reshape((num_filter, -1))
+    else:
+        num_filter = int(weight.attr('num_hidden'))
+
+    # Dot product of normalized prototypes is cosine similarity.
+    weight_ = mx.symbol.L2Normalization(weight, mode='instance')
+    product = mx.symbol.linalg.syrk(weight_, alpha=1., transpose=False) - 2. * mx.symbol.eye(num_filter)
+    theta = mx.symbol.arccos(mx.symbol.max(product, axis=1))
+    loss = -mx.symbol.mean(theta)
+
+    return loss
 
 
 def train_net(args):
