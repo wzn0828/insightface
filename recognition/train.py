@@ -80,8 +80,8 @@ def parse_args():
   args = parser.parse_args()
 
   ##-------local config-------##
-  args.angular_loss = True
-  args.angular_loss_hidden = False
+  args.angular_loss_classify = False
+  args.angular_loss_hidden = True
   args.angular_losstype = 'theta'
   args.angular_loss_weight = 0.03
   ##-------local config-------##
@@ -179,15 +179,17 @@ def get_symbol(args):
     out_list.append(triplet_loss)
 
   # --- add angular loss --- #
-  if args.angular_loss:
-      # Remove diagnonal from loss
-      product = mx.symbol.linalg.syrk(_weight, alpha=1., transpose=False) - 2. * mx.symbol.eye(config.num_classes)
-      # Minimize maximum cosine similarity.
-      if args.angular_losstype == 'cosine':
-        loss = mx.symbol.mean(mx.symbol.max(product, axis=1))
-      elif args.angular_losstype == 'theta':
-        theta = mx.symbol.arccos(mx.symbol.max(product, axis=1))
-        loss = -mx.symbol.mean(theta)
+  if args.angular_loss_classify or args.angular_loss_hidden:
+      loss = 0
+      if args.angular_loss_classify:
+          # Remove diagnonal from loss
+          product = mx.symbol.linalg.syrk(_weight, alpha=1., transpose=False) - 2. * mx.symbol.eye(config.num_classes)
+          # Minimize maximum cosine similarity.
+          if args.angular_losstype == 'cosine':
+            loss = mx.symbol.mean(mx.symbol.max(product, axis=1))
+          elif args.angular_losstype == 'theta':
+            theta = mx.symbol.arccos(mx.symbol.max(product, axis=1))
+            loss = -mx.symbol.mean(theta)
 
       if args.angular_loss_hidden:
           internals = embedding.get_internals()
@@ -310,7 +312,7 @@ def train_net(args):
           triplet_params       = triplet_params,
           mx_model             = model,
       )
-      if args.angular_loss:
+      if args.angular_loss_classify or args.angular_loss_hidden:
           indice=-2
       else:
           indice=-1
@@ -332,14 +334,14 @@ def train_net(args):
       metric1 = AccMetric()
       eval_metrics = [mx.metric.create(metric1)]
       if config.ce_loss:
-        if args.angular_loss:
+        if args.angular_loss_classify or args.angular_loss_hidden:
               indice = -2
         else:
               indice = -1
         metric2 = LossValueMetric(indice)
         eval_metrics.append( mx.metric.create(metric2) )
 
-    if args.angular_loss:
+    if args.angular_loss_classify or args.angular_loss_hidden:
       metric3 = LossValueMetric()
       eval_metrics.append(mx.metric.create(metric3))
 
