@@ -42,19 +42,18 @@ def parse_args():
 
   ##-------local config-------##
   os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
-  default.models_root = '../Experiments/casia-arcface-r50-detachdiff-sqrt-m0.6'
+  default.models_root = '../Experiments/casia-arcface-r50-B110-angular-hidden-0.03'
   default.network = 'r50'
   default.dataset = 'casia'
   default.loss = 'arcface'
-  # default.per_batch_size = 122
 
-  # dataset.casia.max_steps = 34000
-  # dataset.casia.lr_steps = '21000,29500'
+  default.per_batch_size = 110
+  dataset.casia.max_steps = 48000
+  dataset.casia.lr_steps = '23750, 33250'
 
-  # config.net_se = 1
   config.fix_gamma = True
-  config.detach_diff = True
-  config.m_mode = 'larger_sqrt'     # 'default', 'larger_sqrt'
+  config.detach_diff = False
+  config.m_mode = 'default'  # 'default', 'larger_sqrt'
   config.margin = 0.6
   ##-------local config-------##
 
