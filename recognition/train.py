@@ -42,13 +42,13 @@ def parse_args():
 
   ##-------local config-------##
   os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
-  default.models_root = '../Experiments/casia-arcface-r50-B110-angular-hidden-0.03'
+  default.models_root = '../Experiments/casia-arcface-r50-B110-noarcface_dma-lable-1.0'
   default.network = 'r50'
   default.dataset = 'casia'
   default.loss = 'arcface'
 
   default.per_batch_size = 110
-  dataset.casia.max_steps = 48000
+  dataset.casia.max_steps = 38000
   dataset.casia.lr_steps = '23750, 33250'
 
   config.fix_gamma = True
@@ -79,10 +79,16 @@ def parse_args():
   args = parser.parse_args()
 
   ##-------local config-------##
+  config.loss_m2 = 0.0
+
   args.angular_loss_classify = False
-  args.angular_loss_hidden = True
+  args.angular_loss_hidden = False
   args.angular_losstype = 'theta'
   args.angular_loss_weight = 0.03
+
+  args.dma = True
+  args.dma_weight = 1.0
+  args.dma_type = 'lable'   # 'lable', 'dma'
   ##-------local config-------##
 
   return args
@@ -202,9 +208,31 @@ def get_symbol(args):
       out_list.append(angular_loss)
   # --- add angular loss --- #
 
+  # --- add DMA loss ---#
+  if args.dma:
+      # weight_ = mx.symbol.BlockGrad(_weight)
+      dma_cosine = mx.sym.FullyConnected(data=nembedding, weight=_weight, no_bias=True, num_hidden=config.num_classes) / s
+      dma_loss_value = closer_loss(dma_cosine, gt_label, args.dma_type)
+
+      dma_loss = mx.symbol.MakeLoss(dma_loss_value, grad_scale=args.dma_weight)
+      out_list.append(dma_loss)
+  # --- add DMA loss ---#
+
   out = mx.symbol.Group(out_list)
 
   return out
+
+
+def closer_loss(cosine, gt_label, type):
+
+    if type == 'lable':
+        theta = mx.symbol.arccos(mx.sym.pick(cosine, gt_label, axis=1))
+    elif type == 'dma':
+        theta = mx.symbol.arccos(mx.symbol.max(cosine, axis=1))
+
+    loss = mx.symbol.mean(0.5 * mx.symbol.square(theta))
+
+    return loss
 
 
 def get_angular_loss(weight):
